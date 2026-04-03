@@ -49,7 +49,7 @@ XMP is a common metadata structure found in many different file formats. XMP dat
 - `<seal .../>`
 - `<*:seal> ... </*:seal>`, where '*' denotes a namespace, such as `<seal:seal>` or `<xmp:seal>`.
 
-In each case, the parameters for the tag includes the pre-defined fields from the specification. (E.g., <code>&lt;seal:seal seal=1 b=F\~S,s\~f d=**domain** s=**signature** /&gt;</code> or <code>&gt;seal:seal&lt;seal=1 b=F\~S,s\~f d=**domain** s=**signature**&lt;/seal:seal&gt;</code>)
+In each case, the parameters for the tag includes the pre-defined fields from the specification. (E.g., <code>&lt;seal:seal seal=1 b=F\~S,s\~f d=**domain** s=**signature** /&gt;</code> or <code>&lt;seal:seal&gt;seal=1 b=F\~S,s\~f d=**domain** s=**signature**&lt;/seal:seal&gt;</code>)
 
 The default namespace is `seal`. However, decoders should scan any `*:seal` record.
 

@@ -1,11 +1,11 @@
 # Zero Trust Comparisons
 One of the most frequently asked questions relates C2PA to SEAL: What does SEAL provide that C2PA does not?
 
-C2PA and SEAL perform different tasks. SEAL creates a direct proof of authenticity bound to the reputation of a domain name. C2PA proves (or tries to prove) that you used a certain software (and camera) for a piece of media, possible with edited metadata.
+C2PA and SEAL address different problems. SEAL creates a direct proof of authenticity bound to the reputation of a domain name. C2PA proves (or tries to prove) that you used a certain software or cameras for a piece of media, possible with edited metadata.
 
 C2PA is an institutional trust framework anchored in X.509 and curated trust lists. As diagrammed in the [C2PA Specifications](https://spec.c2pa.org/specifications/specifications/2.3/specs/C2PA_Specification.html#_trust_model):
 ![C2PA Trust Model Diagram](docs/c2pa-trust-model-diagram.png)
-- **Certificates**: The signer uses a certificate tied to a curated "trust list" (TL). The validation process is opaque and cannot be verified by the end user. The certificates contain a text name that identifies the certificate owner, but there is no information for cross-validating the attribution.
+- **Certificates**: The signer uses a certificate tied to a curated "trust list" (TL). The validation process relies on a pre-defined Trust List (TL). While this provides a high level of institutional security, it requires the end user to trust the list curators. The certificates contain a text name that identifies the certificate owner, but there is no information for cross-validating the attribution.
 - **Secured Credentials**: The credential issuer trusts the signer to secure their credentials.
 - **Assertions**: C2PA offers two types of assertions. *Gathered assertions* contain data from unvetted sources, such as GPS locations or camera settings, and are explicitly untrusted. *Created assertions* come from trusted services. However, if you do not trust the signer, then the created assertion remains untrusted. The consumer trusts that the assertions made by the signer are valid.
 - **Validation**: The consumer trusts the validator to check the validity and correctly identify signers. As of February 2026, the three main validation methods [c2patool](https://github.com/contentauth/c2pa-rs), Adobe's [Inspect](https://contentauthenticity.adobe.com/inspect), and CAI's [Verify](https://verify.contentauthenticity.org/) often return different and conflicting results for the same media.
@@ -43,7 +43,7 @@ Forensic Admissibility Note: Because C2PA implementations (e.g., Adobe Inspect, 
 ## The "Trust Anchor" Divergence
 The core reason C2PA struggles with Zero Trust is its Trust Anchor.
 
-- C2PA uses a "Black Box" Trust List. To be "Verified," you must be on a list curated by companies like Adobe or Microsoft. This is a centralized, "Trusted Third Party" model that ZT aims to eliminate.
+- C2PA utilizes a curated Trust List model. In contrast, SEAL adopts an 'Infrastructure as Identity' approach, leveraging the existing DNS hierarchy as a decentralized source of truth.
 
 - SEAL uses Infrastructure as Identity. It treats the domain owner's DNS record as the source of truth. If you trust that nytimes.com is owned by the New York Times, you can trust their SEAL signature without needing a middleman CA to "vouch" for them.
 

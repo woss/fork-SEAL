@@ -1,11 +1,12 @@
 # SEAL Specification
-Version 1.2.6, 25-Oct-2025
+Version 1.2.7, 2-April-2026
 
 Secure Evidence Attribution Label (SEAL) is an open solution for assigning attribution with authentication to media. It can be easily applied to pictures, audio files, videos, documents, and other file formats.
 
 This document provides the technical implementation details, including the high-level overview and low-level implementation details for local signer, local verifier, remote signer, and DNS service.
 
 ## Changes
+- 1.2.7 (2026-04-02) Reordering documentation for clarity, updating the supported algorithms. Incorporating feedback from UMBC's Cyber Defense Lab and PASAWG.
 - 1.2.6 (2025-10-25) Revising how revoke works.
 - 1.2.5 (2025-09-27) Revising the definitions for `src`, `srcd`, and `srcf` for source referencing.
 - 1.2.4 (2025-08-19) Updating in sidecar option based on findings during the implementation in SEAL-C.
@@ -46,7 +47,7 @@ SEAL is based on the same concepts used by DKIM ([RFC6376](https://datatracker.i
 4. The recipient system receives the email.
    - It computes the associated hash based on the email contents.
    - It retrieves the public key from the DNS entry using the domain name specified by the DKIM header.
-   - It compares the hash with the signature and public key in in order to see if the signature matches.
+   - It compares the hash with the signature and public key in order to see if the signature matches.
    - If the signature matches, then the email is authenticated and validated. If the signature does not match, then the email is tampered or forged, and discarded as spam.
 
 DKIM provides:
@@ -89,7 +90,13 @@ The length of the signature is dependent on the length of the key. For example:
 - A 1024-bit RSA key pair should generate a 1024-bit (128 byte) signature.
 - A 2048-bit RSA key pair should generate a 2048-bit (256 byte) signature. (The shortest length considered 'strong' by today's standards.)
 
-There exist other public/private key systems, such as DSA (Digital Signature Algorithm), Elliptic Curve, and Lattice-based Cryptography. However, RSA is currently widely used for digital signatures. The current SEAL version only supports RSA; others may be added later.
+> [!WARNING]
+> While strongly discouraged, users may specify weak signatures (e.g., RSA-512). Signers and validators should provide a warning when a weak signature is detected.
+
+## Other Signing Algorithms
+While RSA is currently widely used for digital signatures, there exist other asymmetric cryptographic systems (e.g., public/private key pairs). These include DSA (Digital Signature Algorithm), Elliptic Curve (EC), and Lattice-based or Post-Quantum Cryptography (PQC). The current SEAL version supports RSA and EC; others may be added later. The [SEAL-C](https://github.com/hackerfactor/SEAL-C) implementation supports all RSA and EC algorithms that are provided by OpenSSL.
+
+Elliptic Curve supports a wide range of known curves, such as P-256, secp160r2, and prime256v1. While the specific curve is needed during the key generation, the SEAL key algorithm only needs `ka=ec` because the public key identifies the curve.
 
 ## Key Generation
 SEAL relies on a public/private key pair. (Key creation uses the same steps DKIM uses to create keys for email signing.)
@@ -113,13 +120,15 @@ The public DER file contains raw binary and will need to be encoded before being
 ## DNS Storage
 The public key is stored in a DNS record. This requires access to a domain's DNS service. If you own your own domain name, then adding a DNS entry it typically provided by your domain registrar. However, you cannot add a DNS record to someone else's domain name.
 
-The DNS entry MUST contain a series of field=value pairs. The defined fields are:
+The DNS entry MUST contain a series of field=value pairs. The required fields are:
 - `seal=1` (Required) This specifies a SEAL record for version 1 (the current version). This MUST be the first text in the TXT record.
-- `ka=rsa` (Required) The **k**ey **a**lgorithm. This must match the algorithm used to generate the key. For RSA, use "rsa". For elliptic curve algorithms, use "ka=ec".
-- `kv=1` (Optional) This specifies the **k**ey **v**ersion, in case you update the keys. When not specified, the default value is "1". The value can be any text string using the character set: [A-Za-z0-9.+/-] (letters, numbers, limited punctuation, and quotes or no spaces).
+- `ka=rsa` or `ka=ec` (Required) The **k**ey **a**lgorithm. This must match the asymmetric system used to generate the key. For RSA, use `rsa`; for Elliptic Curve, use `ec`.
+- `p=base64data` or `pkd=base64data` (Required) The base64-encoded **p**ublic key or **p**ublic **k**ey **d**igest. 
+
+The optional fields are:
+- `kv=1` (Optional) This specifies the **k**ey **v**ersion, in case you update the keys. When not specified, the default value is "1". The value can be any text string using the character set: `[A-Za-z0-9.+/-]` (letters, numbers, limited punctuation, and quotes or no spaces).
 - `uid=string`. (Optional) This specifies an optional **u**nique **i**dentifier, such as a UUID or date. The value is case-sensitive. The uid permits different users at a domain to have many different keys. When not present, the default value is an empty string: `uid=''`. The string cannot contain single-quote ('), double-quote ("), or space characters.
 - `pka=sha256` (Optional) The **p**ublic **k**ey **a**lgorithm is the algorithim used to generate the digest of the public key, if a digest is being stored instead of the full key. The Default algorithm is "sha256".
-- `p=base64data` or `pkd=base64data` (Required) The base64-encoded **p**ublic key or **p**ublic **k**ey **d**igest. 
   - Ending "=" in the base64 encoding may be omitted. The value may include whitespace and double quotes. For example: `p="abcdefg="` is the same as `p=abcdefg` is the same as `p="abc" "defg" "="`. 
   - Double quotes and spaces are permitted because some DNS systems require breaks for long values. 
   - If `pkd=` is used then `pka=` must also be present.
@@ -162,21 +171,25 @@ The SEAL metadata format is very similar to the DNS entry format. It consists of
 - Binary data must not be quoted.
 - The values may be quoted with single quotes ['] or double quotes ["]; "smartquotes" and other quoting characters are not permitted. The quote mark that begins the value must also be used to end the value. E.g., "valid", and 'valid', but 'invalid".
 - Unless specified, the valid character set is:
-  - All ASCII letters [A-Za-z] and numbers [0-9]
+  - All ASCII letters `[A-Za-z]` and numbers `[0-9]`
   - Punctuation excluding quotes
   - <i>Either</i> single quote (') or double quote (") but not both. This is because values must be quotable.
   - Space (' ', character code 0x20)
 Other characters, including tabs, binary, and multibyte characters are not permitted.
 
-The fields for specifying the signature are as follows:
+The required fields for specifying the signature are as follows:
 - `seal=1` (Required) This specifies a SEAL record for version 1 (the current version). This MUST be the first text in the SEAL record.
-- `ka=rsa` (Required) The **k**ey **a**lgorithm. This must match the algorithm used to generate the key. For now, you can expect "rsa". For elliptic curve algorithms, use "ec".
-- `kv=1` (Optional) This specifies the **k**ey **v**ersion, in case you update the keys. When not specified, the default value is "1". The value can be any text string using the character set: [A-Za-z0-9.+/-] (letters, numbers, and limited punctuation; no spaces).
+- `ka=rsa` (Required) The **k**ey **a**lgorithm. This must match the algorithm used to generate the key. For RSA, use "rsa", or "ec" for Elliptic Curve algorithms.
+- `d=domain` (Required) The domain name containing the DNS TXT record for the SEAL public key.
+- `s=signature` (Required) The computed signature for the SEAL record. This **MUST** be last value in the SEAL record. If in binary format, the signature must not be quoted. If in base64 or hexadecimal format, the signature may be padded with spaces.
+
+The optional fields are:
+- `kv=1` (Optional) This specifies the **k**ey **v**ersion, in case you update the keys. When not specified, the default value is "1". The value can be any text string using the character set: `[A-Za-z0-9.+/-]` (letters, numbers, and limited punctuation; no spaces).
 - `da=sha256` (Optional) The **d**igest **a**lgorithm. This MUST be a NIST-approved algorithm. Current supported values are:
   - "sha256": The default value.
   - "sha512": For much longer digests.
   - "sha1": For shorter digests. (This algorithm is deprecated by NIST, but still widely used.)
-- `b=range` (Optional) The **b**yte range to include in the digest. This can be a complex field with sets of ranges *start*~*stop*, using tilda to denote the range deliminator. Multiple ranges may be specified by commas.
+- `b=range` (Optional, but strongly recommended) The **b**yte range to include in the digest. This can be a complex field with sets of ranges *start*~*stop*, using tilda to denote the range deliminator. Multiple ranges may be specified by commas.
   - Each range *start*~*stop* segment must be monotonically increasing. The *stop* value must never be before the *start* value. An invalid range is an error.
   - The *start* value must never be located before the start of the file. This is an invalid range error.
   - The *stop* value must never be located after the end of the file. This is an invalid range error.
@@ -195,7 +208,6 @@ The fields for specifying the signature are as follows:
     - As another example, PNG files use chunks that end with a four-byte checksum. The checksum is not known until after the signature is computed. As a result, the byte range must exclude the PNG chunk's checksum. After the checksum is computed and inserted into the file, the chunk checksum must be updated. Assuming that the signature ends at the end of the chunk, the range can use `b=F~S,s+4~f` to exclude the signature and PNG checksum.
     - A streaming video may insert SEAL records using `b=P~S` in order to sign the bytes between the previous signature and the appended streaming data. When finalizing (closing) the video stream, the last SEAL entry SHOULD contain `b=P~S,s~f` to sign from the previous signature to the current signature and from the current signature to the end of the file.
   - If `b=` is not defined, then the default range is `b=F~S,s~f`.
-- `d=domain`: The domain name containing the DNS TXT record for the SEAL public key.
 - `uid=string`. (Optional) This specifies an optional **u**nique **i**dentifier, such as a UUID or date. The value is case-sensitive. The uid permits different users at a domain to have many different keys. The default value is an empty string: `uid=""`.
 - `id=text`: (Optional) A unique identifier identifying the signer's account or identity at the signing domain. When present, this impacts the signature generation.
 - `sf=base64` (Optional) The **s**ignature **f**ormat. Possible values:
@@ -211,9 +223,11 @@ use spaces (character 0x20) after the hexadecimal value.
     - `date1:` specifies one decimal point, such as "20240326164401.5" and accuracy to within 0.05 seconds.
     - `date2:` specifies one decimal point, such as "20240326164401.50" and accuracy to within 0.005 seconds.
     - `date3:` specifies one decimal point, such as "20240326164401.500" and accuracy to within 0.0005 seconds. While this `date3` example is numerically equivalent to the `date1` example, they differ in the specified accuracy.
-- `sl=hex` The **s**ignature **l**ength is typically optional. It is only required if (A) padding is applied, (B) the length of a signature is variable, or (C) the length cannot be determined based on the SEAL record data storage. The length MUST include whatever padding is required for storing the computed signature. The signature algorithm (`ka=`) MUST know how to identify and handle padding. The current supported algorithm (`ka=rsa`) does not require padding and uses a fixed-length, so `sl=` is unnecessary. If the signature contains any padding characters, then this field MUST be included to prevent tampering with the padding.
+- `sl=hex` The **s**ignature **l**ength is typically optional. It is only required if (A) padding is applied, (B) the length of a signature is variable, or (C) the length cannot be determined based on the SEAL record data storage. The length MUST include whatever padding is required for storing the computed signature. The signature algorithm (`ka=`) MUST know how to identify and handle padding.
+  - RSA: The RSA algorithm (`ka=rsa`) does not require padding and uses a fixed-length, so `sl=` is unnecessary.
+  - EC: The Elliptic Curve algorithm (`ka=ec`) uses variable length signatures. Because the public key identifies the required signature size with padding, `sl` is optional. If the value is a quoted string, then spaces may be included at the end of the quoted string to denote padding. If the value is unquoted, then `sl` is required to identify the amount of padding.
+
 - `pk=public-key` (Optional) The **p**ublic **k**ey used to generate the signature. This allows for longer keys than the DNS records easily support. If this is present then the `pkd=` in the DNS record must be set, and the `p=` should not be, if both are present then the `p=` must also be verified.
-- `s=signature` (Required) The computed signature for the SEAL record. This MUST be last value in the SEAL record. If in binary format, the signature must not be quoted. If in base64 or hexadecimal format, the signature may be padded with spaces.
 
 A sample SEAL signature may look like:
 ```
@@ -304,13 +318,15 @@ The signer does not need to be the same system that is populating the SEAL recor
 
 The remote signer DOES NOT require a copy of the file! This provides content privacy. The remote signer only needs:
 - `seal=1` (Required) This specifies a SEAL record for version 1 (the current version). This MUST match the DNS entry for the public key.
-- `ka=rsa` (Required) The **k**ey **a**lgorithm. This must match the algorithm used to generate the key. This MUST match the DNS entry for the public key.
+- `ka=rsa` or `ka=ec` (Required) The **k**ey **a**lgorithm. This must match the algorithm used to generate the key. This MUST match the DNS entry for the public key.
+- `d=*digest*`: (Required) The digest bytes using case-insensitive hex formatting. This will be converted by the signer to binary data before signing.
+
+Optional fields for the remote signer include:
 - `kv=1` (Optional) This specifies the **k**ey **v**ersion, in case you update the keys. When not specified, the default value is "1". This MUST match the DNS entry for the public key.
 - `uid=string`. (Optional) This specifies an optional **u**nique **i**dentifier, such as a UUID or date. This MUST match the DNS entry for the public key.
 - `da=sha256` (Optional) The **d**igest **a**lgorithm. This MUST match the `da=` entry in the metadata.
 - `id=text` (Optional) This specifies user user's identity at the signing service. This MUST match the `id=` entry in the metadata.
 - `sf=hex` (Optional) The **s**ignature **f**ormat. This MUST match the `sf=` entry in the metadata.
-- `d=*digest*`: (Required) The digest bytes using case-insensitive hex formatting. This will be converted by the signer to binary data before signing.
 
 These specific values are needed for remotely signing. However, the fields are recommendations. For example, a web-based signing system may use alternate field names to convey the same values.
 
@@ -362,7 +378,7 @@ For inline public key signed files:
 1. The byte range (`b=`) is parsed to identify the values to be sent to the digest hashing function.
 1. The digest algorithm (`da=`) is used to generate a digest of the file.
 1. Retrieve the public key digest and public key digest algorithm from the DNS entry specified by the domain name (`d=`).
-1. Use the public key digest algortithm (`pka=`) and the public key (`pk=`) to calculate and verify the digest stored in the DNS record.
+1. Use the public key digest algorithm (`pka=`) and the public key (`pk=`) to calculate and verify the digest stored in the DNS record.
 1. The public key is used with the key algorithm (`ka=`) to decrypt the signature (`s=`), resulting in a digest.
 1. If the computed digest matches the decrypted digest, then the signature matches. This validates all bytes covered by the byte range (`b=`).
 
@@ -397,7 +413,7 @@ Signing applications MUST scan the media for prior signatures.
 - File formats that permit appending, such as streaming media formats like AJPEG (animated jpeg; common for low-end video camera) and MPEG (for streaming video), do not require any finalized ranges. The finalized range SHOULD only be provided when the stream ends.
 - Any new signature MUST be inserted *after* all previous signatures. This prevents the new signature from invalidating any previous signature.
 - For appending (not finalizing), the `b=` range SHOULD reference all data up to the next appending point. At minimum, this should include the end of the SEAL record. For example, `b=P~S,s~s+6` will span from the previous signature to the current signature *and* covers 6 bytes after the end of the current signature.
-- To retain integrity, appended segments MUST overlap signatures (e.g., `b=P~S`) rather than only signing the appended data (e.g., `b=p~S`). The overlap prevents a malicious user from replacing a signed data segment without detection. Non-overlapping signatures (e.g., `b=p~S`) SHOULD only be used when each appended segment is independent (e.g., hard drive sectors).
+- To retain integrity, appended segments MUST overlap signatures (e.g., `b=P~S`) rather than only signing the appended data (e.g., `b=p~S`). The overlap prevents a malicious user from replacing a signed data segment without detection. Non-overlapping signatures (e.g., `b=p~S`) SHOULD only be used when each appended segment is independent (e.g., hard drive sectors or streaming media segments).
 
 ### File-specific Formats
 The SEAL record always contains the wrapper "<seal seal=*version* ... />". This can appear in XMP, EXIF, or format-specific locations:
