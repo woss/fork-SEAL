@@ -98,6 +98,11 @@ While RSA is currently widely used for digital signatures, there exist other asy
 
 Elliptic Curve supports a wide range of known curves, such as P-256, secp160r2, and prime256v1. While the specific curve is needed during the key generation, the SEAL key algorithm only needs `ka=ec` because the public key identifies the curve.
 
+> [!NOTICE]
+> Cryptography is a moving target. Algorithms that are 'strong' today may be 'weak' in the future. An algorithm's strength is relative to current computing power and mathematical breakthroughs. The following heuristics identify the current (2026) best practices:
+> - RSA: Use a minimum of 3072 bits. While 2048-bit keys is common and 'strong', it is increasingly viewed as the "floor" rather than the standard for long-term security.
+> - Elliptic Curve (EC): Use a minimum of 256 bits (e.g., NIST P-256 or Curve25519). These provide equivalent security to RSA-3072 with significantly higher performance.
+
 ## Key Generation
 SEAL relies on a public/private key pair. (Key creation uses the same steps DKIM uses to create keys for email signing.)
 - The private key is kept with the signer and prevents anyone else from creating a forged signature. To create the private key, you can use:
