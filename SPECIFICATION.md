@@ -1,15 +1,16 @@
 # SEAL Specification
-Version 1.2.7, 2-April-2026
+Version 1.2.8, 5-April-2026
 
 Secure Evidence Attribution Label (SEAL) is an open solution for assigning attribution with authentication to media. It can be easily applied to pictures, audio files, videos, documents, and other file formats.
 
 This document provides the technical implementation details, including the high-level overview and low-level implementation details for local signer, local verifier, remote signer, and DNS service.
 
 ## Changes
+- 1.2.8 (2026-04-05) Better documentation for revocation and identifying the untrusted backdate scenario.
 - 1.2.7 (2026-04-02) Reordering documentation for clarity, updating the supported algorithms. Incorporating feedback from UMBC's Cyber Defense Lab and PASAWG.
-- 1.2.6 (2025-10-25) Revising how revoke works.
+- 1.2.6 (2025-10-25) Revising how revocation works.
 - 1.2.5 (2025-09-27) Revising the definitions for `src`, `srcd`, and `srcf` for source referencing.
-- 1.2.4 (2025-08-19) Updating in sidecar option based on findings during the implementation in SEAL-C.
+- 1.2.4 (2025-08-19) Updating the sidecar option based on findings during the implementation in SEAL-C.
 - 1.2.3 (2025-05-31) Adding in sidecar option.
 - 1.2.2 (2025-02-13) For readability: Splitting the signing, informational, and source reference fields into separate subsections.
 - 1.2.1 (2025-02-12) Adding derived source references.
@@ -68,7 +69,7 @@ With SEAL:
 4. Any recipient of the file can validate the signature:
    - It computes the associated hash based on the file's contents, as specified in the SEAL metadata.
    - It retrieves the public key from the DNS entry using the domain name specified by the SEAL metadata.
-   - It compares the hash with the signature (in the metadata) and public key (from DNS) in in order to see if the signature matches.
+   - It compares the hash with the signature (in the metadata) and public key (from DNS) in order to see if the signature matches.
    - If the signature matches, then the file is authenticated and validated. If the signature does not match, then the file is tampered or forged, and explicitly untrusted.
 
 ## About RSA Signing
@@ -101,7 +102,7 @@ Elliptic Curve supports a wide range of known curves, such as P-256, secp160r2, 
 > [!IMPORTANT]
 > Cryptography is a moving target. Algorithms that are 'strong' today may be 'weak' in the future. An algorithm's strength is relative to current computing power and mathematical breakthroughs. The following heuristics identify the current (2026) best practices:
 > - RSA: Use a minimum of 3072 bits. While 2048-bit keys is common and 'strong', it is increasingly viewed as the "floor" rather than the standard for long-term security.
-> - Elliptic Curve (EC): Use a minimum of 256 bits (e.g., NIST P-256 or Curve25519). These provide equivalent security to RSA-3072 with significantly higher performance.
+> - Elliptic Curve (EC): Use a minimum of 256 bits (e.g., NIST P-256). EC with 256 bits provide equivalent security to RSA-3072 with significantly higher performance while requiring much less data storage.
 
 ## Key Generation
 SEAL relies on a public/private key pair. (Key creation uses the same steps DKIM uses to create keys for email signing.)
@@ -132,19 +133,22 @@ The DNS entry MUST contain a series of field=value pairs. The required fields ar
 
 The optional fields are:
 - `kv=1` (Optional) This specifies the **k**ey **v**ersion, in case you update the keys. When not specified, the default value is "1". The value can be any text string using the character set: `[A-Za-z0-9.+/-]` (letters, numbers, limited punctuation, and quotes or no spaces).
-- `uid=string`. (Optional) This specifies an optional **u**nique **i**dentifier, such as a UUID or date. The value is case-sensitive. The uid permits different users at a domain to have many different keys. When not present, the default value is an empty string: `uid=''`. The string cannot contain single-quote ('), double-quote ("), or space characters.
-- `pka=sha256` (Optional) The **p**ublic **k**ey **a**lgorithm is the algorithim used to generate the digest of the public key, if a digest is being stored instead of the full key. The Default algorithm is "sha256".
+- `uid=`*string`*. (Optional) This specifies an optional **u**nique **i**dentifier, such as a UUID or date. The value is case-sensitive. The uid permits different users at a domain to have many different keys. When not present, the default value is an empty string: `uid=''`. The string cannot contain single-quote ('), double-quote ("), or space characters.
+- `pka=sha256` (Optional) The **p**ublic **k**ey **a**lgorithm is the algorithm used to generate the digest of the public key, if a digest is being stored instead of the full key. The default algorithm is "sha256".
   - Ending "=" in the base64 encoding may be omitted. The value may include whitespace and double quotes. For example: `p="abcdefg="` is the same as `p=abcdefg` is the same as `p="abc" "defg" "="`. 
   - Double quotes and spaces are permitted because some DNS systems require breaks for long values. 
   - If `pkd=` is used then `pka=` must also be present.
   - The `p=` or `pkd=` parameter MUST be the last field in the DNS TXT record.
 
-DNS has a limit of 255 bytes per text string. Longer SEAL records can be split into strings. For this reason, values cannot contain double quotes. Most DNS providers will automatically split long strings when you create the TXT field.
-
 A complete DNS record may look like:
 ```
 seal.example.com TXT seal=1 ka=rsa p="MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA43KBD2MSnczlYRZJqS9BPjwFK1o+obHy" "oV2II2R2jbug91wzBfUU+uJm3iYbfQWz7CJ5fbzN+OQT+sXM5PjdjCPKI/4o+h58QqBlF8JrS5ip" "QwZtJfgvd7UKYxvL4trDTeU7zqShTHygMNibn9LzcwhHQ2MJvuq76V6W6lobab56oHQjwvH3Rqqw" "YJtOpr3qt3+oIq5Ex++GD9DYuJDQce2KNhAd8zLb8Y0fzpvOEQaOTG6vgnoWJlIWFAkZaHlI5ie2" "lI3YYX5z9+j9wucCEfu3fdm7nB4VzTGyW3D7zdFyMbEbhY6jPv+0k7IWWS5QV8DpTkgPj0VU5Xxw" "ty6cGQIDAQAB"
 ```
+
+> [!IMPORTANT]
+> DNS has a limit of 255 bytes per text string. Longer SEAL records can be split into strings. For this reason, values cannot contain double quotes. Most DNS providers will automatically split long strings when you create the TXT field. For maximum compatibility, the SEAL records should not be longer than 255 characters.
+>
+> Some cryptographic algorithms, such as RSA-4096 or post-quantum cryptography, may have very long keys that do not fit in DNS. See [Inline Public Keys](#inline-public-keys).
 
 The hostname does *not* need to contain "seal". The only requirement is that it must be a valid DNS name *and* must match the domain name specified in the metadata signature.
 
@@ -159,13 +163,42 @@ The `r=` parameter is the recommended way to revoke a SEAL DNS record.
 - `p=`, `p=revoke`, or no `p=` defined. This sets a global revocation, indicating that "all signatures that do not explicitly matched some other DNS TXT record" are revoked. `r=` is not required when setting a global revocation.
 - If both `r=` is present and `p=` denotes a revocation, then `r=` must be ignored and all keys are revoked. This is because there is no public key available for validating pre-revocation signatures.
 
-When checking a DNS record against a SEAL record, all provided DNS fields must match. For example, if `seal=` does not match the version number, or `ka` is defined in DNS and does not match the SEAL record's key algorithm, or DNS defines an `id` and it does not match the SEAL record, then the revocation does not apply.
+Sample revocations in DNS may look like:
+```
+seal=1 ka=ec p=revoke
+
+seal=1 r=revoke ka=ec p=MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9d0Zy7dhvucfY89RzGJyO+2gcFbCqIx3MBh9PpTc7XLUj/PuK+zGAv7WmSVEQbPaVmpAwwzqEZ+vll98c+GWEQ==
+
+seal=1 ka=ec r=2025-10-01T12:01:02 p=MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9d0Zy7dhvucfY89RzGJyO+2gcFbCqIx3MBh9PpTc7XLUj/PuK+zGAv7WmSVEQbPaVmpAwwzqEZ+vll98c+GWEQ==
+```
+
+When checking a DNS record against a SEAL record, all provided DNS fields must match. For example, if `seal=` does not match the version number, or `ka` is defined in DNS and does not match the SEAL record's key algorithm, or DNS defines an `id` or `uid` that does not match the SEAL record, then the revocation does not apply.
 
 The logic for checking for revocations should be:
 1. If a **revoked** DNS record exists that validates the signature, then the signature is revoked.
 2. Else: If a DNS record exists and validates the signature (without a revoke), then the signature is valid.
 3. Else: If no DNS records validate the signature and there is a generic revocation (e.g., `p=revoke`), then the record is revoked.
 4. Else: If no DNS record validates the signature and no mention of a global revocation, then validation status is 'not found'.
+
+> [!IMPORTANT]
+> If a public key is revoked with a date, it does *not* mean that all signatures before that date are trusted. The reason: A public key that is compromised by an attacker can be used to backdate content so that it appears to be signed before the revocation date.
+>
+> If you see a signature that predates a revoked date, then the media should be compared against other trusted date information. For example, if the same signed media can be shown to have existed before the revocation date (e.g., found on a trusted news service, dated social media posting, or at the Internet Archive), then the date can be trusted as valid. However, seeing a previously undiscovered file with a signature that predates the revocation could be backdated by the stolen keys and should not be fully trusted. In forensics, this requires *Proof of Existence*.
+>
+> This risk from trusting revoked keys based on the date is not limited to SEAL. The same problem impacts virtually all cryptographic solutions, including PGP, trusted timestamp authorities (RFC 3161), and more.
+
+A validator must iterate through all available SEAL DNS TXT records for the given domain. The status is determined by the first record that matches the signature, or a global fallback if no match is found.
+
+| Result of Key Match | Revocation Tag (`r=`) | Final Status |
+| :--- | :--- | :--- |
+| **Valid Signature** | None | ✅ **VALID** |
+| **Valid Signature** | `r=date` and pre-date signature | 🔍 **SUSPECT**; confirm with trusted Proof of Existence |
+| **Valid Signature** | `r=date` and no signature date | ❌ **REVOKED** |
+| **Valid Signature** | `r=date` and post-dated signature | ❌ **REVOKED** |
+| **Valid Signature** | `r=revoke` | ❌ **REVOKED** |
+| **Invalid Signature** | Any | *Check next record...* |
+| **No Matches** (default) | `p=revoke` | ❌ **REVOKED** |
+| **No Matches** (default) | No revoke | 🔍 **NOT FOUND** |
 
 ## Metadata Signature Format
 The SEAL metadata format is very similar to the DNS entry format. It consists of:
@@ -184,7 +217,7 @@ Other characters, including tabs, binary, and multibyte characters are not permi
 
 The required fields for specifying the signature are as follows:
 - `seal=1` (Required) This specifies a SEAL record for version 1 (the current version). This MUST be the first text in the SEAL record.
-- `ka=rsa` (Required) The **k**ey **a**lgorithm. This must match the algorithm used to generate the key. For RSA, use "rsa", or "ec" for Elliptic Curve algorithms.
+- `ka=rsa` or `ka=ec` (Required) The **k**ey **a**lgorithm. This must match the algorithm used to generate the key. For RSA, use "rsa", or "ec" for Elliptic Curve algorithms.
 - `d=domain` (Required) The domain name containing the DNS TXT record for the SEAL public key.
 - `s=signature` (Required) The computed signature for the SEAL record. This **MUST** be last value in the SEAL record. If in binary format, the signature must not be quoted. If in base64 or hexadecimal format, the signature may be padded with spaces.
 
@@ -324,7 +357,7 @@ The signer does not need to be the same system that is populating the SEAL recor
 The remote signer DOES NOT require a copy of the file! This provides content privacy. The remote signer only needs:
 - `seal=1` (Required) This specifies a SEAL record for version 1 (the current version). This MUST match the DNS entry for the public key.
 - `ka=rsa` or `ka=ec` (Required) The **k**ey **a**lgorithm. This must match the algorithm used to generate the key. This MUST match the DNS entry for the public key.
-- `d=*digest*`: (Required) The digest bytes using case-insensitive hex formatting. This will be converted by the signer to binary data before signing.
+- `d=digest`: (Required) The digest bytes using case-insensitive hex formatting. This will be converted by the signer to binary data before signing.
 
 Optional fields for the remote signer include:
 - `kv=1` (Optional) This specifies the **k**ey **v**ersion, in case you update the keys. When not specified, the default value is "1". This MUST match the DNS entry for the public key.
@@ -379,20 +412,27 @@ For the extended date and/or id information:
 7. The public key is used with the key algorithm (`ka=`) to decrypt the signature (`s=`, after any "date:"), resulting in a digest.
 8. If the computed digest (from step 5) matches the decrypted digest (from step 6), then the signature matches. This validates all bytes covered by the byte range (`b=`), as well as any timestamp and user id.
 
-For inline public key signed files:
-1. The byte range (`b=`) is parsed to identify the values to be sent to the digest hashing function.
-1. The digest algorithm (`da=`) is used to generate a digest of the file.
-1. Retrieve the public key digest and public key digest algorithm from the DNS entry specified by the domain name (`d=`).
-1. Use the public key digest algorithm (`pka=`) and the public key (`pk=`) to calculate and verify the digest stored in the DNS record.
-1. The public key is used with the key algorithm (`ka=`) to decrypt the signature (`s=`), resulting in a digest.
-1. If the computed digest matches the decrypted digest, then the signature matches. This validates all bytes covered by the byte range (`b=`).
-
 All verification is performed locally. There is no need to consult any external service for validating the cryptography. This also permits private verification:
 - DNS is required for retrieving the public key. However, DNS is a request-forwarding service. The domain providing the key never knows who is performing the validation. (Unless you intentionally bypass the DNS relaying and contact the authoritative DNS server directly.)
 - Your local DNS server only sees a request for a DNS TXT lookup for a domain name. It does not know if you want the SEAL information, DKIM, SPF, or other data that is stored in the DNS TXT fields.
 - DNS requests are cached by intermediary services. Repeated DNS lookups are typically fast, and the authoritative domain system never knows when someone does repeated requests.
 
 For offline use, the DNS record may be copied locally and used in place of an active DNS lookup. However, this usage may not notice if there is a revocation posted to DNS at a later time.
+
+### Inline Public Keys
+SEAL permits including the public key in the SEAL record and a digest of the public key in DNS. This approach addresses two problem:
+- **Large Public Keys**: Some cryptographic algorithms use public keys that are too large for storing in DNS. These include RSA-3072 and larger, and post-quantum cryptography (PQC) like Dilithium.
+- **Offline Validation**: Some media may require validation while offline.
+
+In both cases, the validator can use the inline public key (`pk=`) to verify the cryptography. However, this does not authenticate the signer. A digest of the public key (e.g., `pka=sha256`) can be checked against the keys found in DNS (same `pka=` with a `pkd=` value) to authenticate the public key against the domain's ownership.
+
+For inline public key signed files:
+1. The byte range (`b=`) is parsed to identify the values to be sent to the digest hashing function.
+2. The digest algorithm (`da=`) is used to generate a digest of the file.
+3. Retrieve the public key digest (`pkd=`) and public key digest algorithm (`pka=`) from the DNS entry specified by the domain name (`d=`).
+4. Use the public key digest algorithm (`pka=`) and the public key (`pk=`) to calculate and verify the digest stored in the DNS record.
+5. The public key is used with the key algorithm (`ka=`) to decrypt the signature (`s=`), resulting in a digest.
+6. If the computed digest matches the decrypted digest, then the signature matches. This validates all bytes covered by the byte range (`b=`).
 
 ## Metadata Signature Storage Area
 The SEAL metadata record may be stored in format-specific data blocks, or generic XML-like data records. Although the nomenclature may be format-specific, the basic requirements remain the same:
@@ -482,4 +522,3 @@ The following concepts were considered while deciding on the SEAL format:
   - There needs to be a way to specify multiple signing domains: one for each signer. The `d=` parameter only supports one domain and overloading it with a list of domains becomes overly complicated.
   - It would require the client to have their own domain for signing. However, the purpose of the external signer is to provide a signature even when the client doesn't have their own domain.
   - If we have two signers, then what about three? Or *n* signers? One DNS signer is fine. Multiple DNS queries for public keys could be used to subtly triangulate someone who is validating a signature, which is a breach of privacy. And if *n* is large, it could be used as the basis for a denial-of-service attack.
-
