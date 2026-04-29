@@ -133,7 +133,7 @@ The DNS entry MUST contain a series of field=value pairs. The required fields ar
 
 The optional fields are:
 - `kv=1` (Optional) This specifies the **k**ey **v**ersion, in case you update the keys. When not specified, the default value is "1". The value can be any text string using the character set: `[A-Za-z0-9.+/-]` (letters, numbers, limited punctuation, and quotes or no spaces).
-- `uid=`*string`*. (Optional) This specifies an optional **u**nique **i**dentifier, such as a UUID or date. The value is case-sensitive. The uid permits different users at a domain to have many different keys. When not present, the default value is an empty string: `uid=''`. The string cannot contain single-quote ('), double-quote ("), or space characters.
+- `uid=`*string*. (Optional) This specifies an optional **u**nique **i**dentifier, such as a UUID or date. The value is case-sensitive. The uid permits different users at a domain to have many different keys. When not present, the default value is an empty string: `uid=''`. The string cannot contain single-quote ('), double-quote ("), or space characters.
 - `pka=sha256` (Optional) The **p**ublic **k**ey **a**lgorithm is the algorithm used to generate the digest of the public key, if a digest is being stored instead of the full key. The default algorithm is "sha256".
   - Ending "=" in the base64 encoding may be omitted. The value may include whitespace and double quotes. For example: `p="abcdefg="` is the same as `p=abcdefg` is the same as `p="abc" "defg" "="`. 
   - Double quotes and spaces are permitted because some DNS systems require breaks for long values. 
